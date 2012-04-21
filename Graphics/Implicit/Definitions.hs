@@ -5,7 +5,7 @@ module Graphics.Implicit.Definitions where
 
 -- Let's make things a bit nicer. 
 -- Following math notation ℝ, ℝ², ℝ³...
-type ℝ = Float
+type ℝ = Double
 type ℝ2 = (ℝ,ℝ)
 type ℝ3 = (ℝ,ℝ,ℝ)
 

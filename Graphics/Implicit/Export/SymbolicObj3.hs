@@ -12,7 +12,11 @@ module Graphics.Implicit.Export.SymbolicObj3 (symbolicGetMesh) where
 import Graphics.Implicit.Definitions
 
 import Graphics.Implicit.Export.Definitions
-import Graphics.Implicit.Export.MarchingCubes
+
+-- Only select one of the two
+-- import Graphics.Implicit.Export.MarchingCubes
+import Graphics.Implicit.Export.CubicMarchingSquares
+--
 
 import Graphics.Implicit.Primitives
 import Graphics.Implicit.ObjectUtil

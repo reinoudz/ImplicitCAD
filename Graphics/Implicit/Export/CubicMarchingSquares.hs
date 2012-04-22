@@ -228,8 +228,8 @@ gen_octree bot top level obj =
 gen_leaf_cells :: ℝ3 -> ℝ3 -> ℝ -> Obj3 -> [Cell]
 gen_leaf_cells p@(x1, y1, z1) q@(x2, y2, z2) res obj = 
 	let
-		p'@(x1', y1', z1') = (x1-0.5, y1-0.5, z1-0.5)
-		q'@(x2', y2', z2') = (x2+0.5, y2+0.5, z2+0.5)
+		p'@(x1', y1', z1') = (x1-1.0, y1-1.0, z1-1.0)
+		q'@(x2', y2', z2') = (x2+1.0, y2+1.0, z2+1.0)
 
 		-- How many steps will we take on each axis?
 		nx = fromIntegral $ ceiling $ (x2' - x1') / res

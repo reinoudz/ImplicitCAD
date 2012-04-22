@@ -52,16 +52,16 @@ import qualified Graphics.Implicit.SaneOperators as S
 -- | all calculated info about a point
 type Sample = (ℝ3, ℝ3, ℝ)
 
--- | an Edgecrossing has 0, 1 or 2 crosspoints
+-- | an Edgecrossing has either no or one crosspoint
 type Edgecrossing = [Sample]
 
 -- | a Face : corners, 3D->2D mapping and calculated edge crossings
 type Face = ([Sample], ℝ3, ℝ3, ℝ3, [Edgecrossing])
 
--- | a line
+-- | lines on a face have a start, a calculated intermediate point and an end point
 type FaceLines = [(Sample, Sample, Sample)]
 
--- | a Cell has a specified size and 12 edges
+-- | a Cell has a bounding box, the 8 corners, the 12 edge crossings and for each face the lines
 type Cell = (ℝ3, ℝ3, [Sample], [Edgecrossing], [FaceLines])
 
 -- | calculate a norm for a vertex
@@ -152,7 +152,7 @@ enum_faces (p0:p1:p2:p3:p4:p5:p6:p7:[]) (e0:e1:e2:e3:e4:e5:e6:e7:e8:e9:e10:e11:[
 			y = (0,1,0)
 			z = (0,0,1)
 	
--- | Sort two samples
+-- | sort two samples for more deterministic calculation outcomes
 sort_sample :: Sample -> Sample -> (Sample, Sample)
 sort_sample s1@(p1, n1, v1) s2@(p2, n2, v2) =
 	if p1 < p2 then
@@ -160,7 +160,7 @@ sort_sample s1@(p1, n1, v1) s2@(p2, n2, v2) =
 	else
 		(s2, s1)
 
--- | Interpolate between two Samples to find the zero
+-- | interpolate between two Samples to find the zero
 interpolate ::  ℝ3 -> ℝ -> ℝ3 -> ℝ -> Obj3 -> (ℝ, ℝ3)
 interpolate left@(x1, y1, z1) left_obj right@(x2, y2, z2) right_obj obj =
 	let
@@ -179,7 +179,7 @@ interpolate left@(x1, y1, z1) left_obj right@(x2, y2, z2) right_obj obj =
 			else
 				interpolate mid mid_obj right right_obj obj
 
--- | calculate the zero, one or two intersection of the edge with the object
+-- | calculate the intersection if present of the edge with the object
 calc_intersect_edge :: Obj3 -> (Sample, Sample) -> [Sample]
 calc_intersect_edge obj (s1, s2) =
 	let
@@ -224,7 +224,7 @@ gen_octree bot top level obj =
 			-- generate our output
 			[(bot, top, corners, edges, [])]
 
--- | generate the interesting leaf cells
+-- | generate all the cells in the specified box
 gen_leaf_cells :: ℝ3 -> ℝ3 -> ℝ -> Obj3 -> [Cell]
 gen_leaf_cells p@(x1, y1, z1) q@(x2, y2, z2) res obj = 
 	let
@@ -292,7 +292,7 @@ calc_intersect bot top s0 s1 eA eB eC =
 		too_sharp = xs <= xmin || xs >= xmax || ys <= ymin || ys >= ymax 
 	in
 		if too_sharp || parallel then
-			-- parallel, or too sharp angle just take mid point
+			-- when parallel, or has too sharp angles, just take mid point
 			(False, mid)
 		else
 			(True, xs S.* eA S.+ ys S.* eB S.+ pz S.* eC)
@@ -365,12 +365,13 @@ gen_facelines bot top (samples, eA, eB, eC, edgecrossings) =
 --			[]	-- XXX TODO resolve me
 			
 
--- | create segments for the faces for this cell
+-- | create object segments for the cell by calculating the face lines
 gen_segments :: Cell -> Cell
 gen_segments cell@(bot, top, corners, edges, _) =
 	(bot, top, corners, edges, map (gen_facelines bot top) $ enum_faces corners edges)
 
 
+-- | trace an object in a cell by picking the lines (from all the faces) that form a cycle.
 trace_obj :: (Sample, Sample, Sample) -> (FaceLines, FaceLines) -> (FaceLines, FaceLines)
 trace_obj start (object, []) = (object, [])
 trace_obj start (object, (l:rest)) =
@@ -395,6 +396,7 @@ trace_obj start (object, (l:rest)) =
 			trace_obj start (object, rest ++ [l])
 
 
+-- | trace all objects (cycles) from the lines in a cell
 trace_objects :: [FaceLines] -> FaceLines -> [FaceLines]
 trace_objects done [] = done
 trace_objects done (start:rest) =
@@ -420,7 +422,7 @@ sharp_aproximation :: [ℝ3] -> ℝ3 -> [ℝ]
 sharp_aproximation mat vec = map (vec S.⋅) mat
 
 
--- | calculate center of lines
+-- | calculate center of lines, ignoring the calculated intersection for now
 sharp_center :: FaceLines -> ℝ3
 sharp_center lines =
 	let
@@ -428,14 +430,15 @@ sharp_center lines =
 		sum [] = (0,0,0)
 		sum (((s1,_,_), (s2,_,_), (s3,_,_)):rest) =
 			s1 S.+ s3 S.+ (sum rest)
-	--			s1 S.+ s2 S.+ s3 S.+ (sum rest)
+--			s1 S.+ s2 S.+ s3 S.+ (sum rest)
 		(sx, sy, sz) = sum lines
 		l = fromIntegral $ 2 * length lines
 	in
 		(sx/l, sy/l, sz/l)
 
 
--- | find best fit
+-- | find best fit of an extremity (cap) on the 3d object defined by
+-- the facelines using their normals using least squares method
 sharp_find :: FaceLines -> ℝ3
 sharp_find lines =
 	let
@@ -465,7 +468,8 @@ sharp_find lines =
 
 		calc_angles ((_, n1, _), (_,_,_), (_, n2, _)) = n1 S.⋅ n2
 	in
-		-- first detect sharp features before racing outside the box
+		-- first detect sharp features before racing outside the box,
+		-- this prevents runaways of the cap
 		if not . null $ filter (<0.999) (map calc_angles lines) then
 			sharp_find_iter $ sharp_calc center
 		else
@@ -485,6 +489,7 @@ triangulation lines =
 	in
 		concat [triangles f i e | ((f,_,_),(i,_,_),(e,_,_)) <- lines]
 
+
 -- | explicit spacing of the cubes for visualisation / debug purposes
 spacify :: ℝ3 -> TriangleMesh -> TriangleMesh
 spacify (x0, y0, z0) mesh = map movetriangle mesh
@@ -492,15 +497,16 @@ spacify (x0, y0, z0) mesh = map movetriangle mesh
 		movetriangle (a, b, c) = (a S.+ delta, b S.+ delta, c S.+ delta)
 		delta = (0.15 * x0, 0.15 * y0, 0.15 * z0)
 
+
 -- | create triangles for a given give
 gen_triangles :: Cell -> TriangleMesh
 gen_triangles cell@(bot, top, corners, edges, facelines) =
 	let
 		objects = trace_objects [] $ concat facelines
+		-- TODO de_ambiguatify two caps, rare though
 		process obj = {- spacify bot $ -} triangulation obj
 	in
 		concat $ map process objects
---	concat $ [triangulation $ de_ambiguatify $ 
 
 
 -- | getMesh gets a triangle mesh describe the boundary of your 3D
@@ -522,5 +528,6 @@ getMesh p q res obj =
 		sane (a, b, c) = not (a == b || a == c || b == c)
 	in
 		concat $ triangles
+		-- still needed?
 --		[triangle | triangle <- concat $ triangles, sane triangle]
 

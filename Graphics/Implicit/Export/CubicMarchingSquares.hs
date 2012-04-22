@@ -244,7 +244,7 @@ gen_leaf_cells p@(x1, y1, z1) q@(x2, y2, z2) res obj =
 
 
 -- | calculate intersection between two samples using their normals
-calc_intersect :: ℝ3 -> ℝ3 -> Sample -> Sample -> ℝ3 -> ℝ3 -> ℝ3 -> (Bool, ℝ3)
+calc_intersect :: ℝ3 -> ℝ3 -> Sample -> Sample -> ℝ3 -> ℝ3 -> ℝ3 -> ℝ3
 calc_intersect bot top s0 s1 eA eB eC =
 	let
 		((p0, n0, v0), (p1, n1, v1)) = sort_sample s0 s1
@@ -293,9 +293,10 @@ calc_intersect bot top s0 s1 eA eB eC =
 	in
 		if too_sharp || parallel then
 			-- when parallel, or has too sharp angles, just take mid point
-			(False, mid)
+			mid
 		else
-			(True, xs S.* eA S.+ ys S.* eB S.+ pz S.* eC)
+			-- return calculated intersection
+			xs S.* eA S.+ ys S.* eB S.+ pz S.* eC
 
 
 -- | generate the slice lines for a face on a cube
@@ -314,15 +315,10 @@ gen_facelines bot top (samples, eA, eB, eC, edgecrossings) =
 		e3 = head ec3
 
 		hat :: Sample -> Sample -> FaceLines
-		hat a b =
-			let
-				(hit, cross) = calc_intersect bot top a b eA eB eC
+		hat a b = [(a, ab, b)]
+			where
+				cross = calc_intersect bot top a b eA eB eC
 				ab = (cross, (0,0,0), 0)
-			in
---				if (hit) then
-					[(a, ab, b)]
---				else
---					[(a, a, b)]
 	in
 		case (p0v < 0, p1v < 0, p2v < 0, p3v < 0) of
 		(False, False, False, False) ->	-- not possible
@@ -481,11 +477,7 @@ triangulation :: FaceLines -> TriangleMesh
 triangulation lines =
 	let
 		sharp = sharp_find lines
-		triangles f i e =
-			if f/=i then
-				[(f, sharp, i), (i, sharp, e)]
-			else
-				[(f, sharp, e)]
+		triangles f i e = [(f, sharp, i), (i, sharp, e)]
 	in
 		concat [triangles f i e | ((f,_,_),(i,_,_),(e,_,_)) <- lines]
 

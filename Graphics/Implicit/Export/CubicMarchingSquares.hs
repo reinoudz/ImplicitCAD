@@ -64,6 +64,13 @@ type FaceLines = [(Sample, Sample, Sample)]
 -- | a Cell has a bounding box, the 8 corners, the 12 edge crossings and for each face the lines
 type Cell = (ℝ3, ℝ3, [Sample], [Edgecrossing], [FaceLines])
 
+
+-- | calculate crossproduct of two vectors
+cross :: ℝ3 -> ℝ3 -> ℝ3
+cross (v1, v2, v3) (w1, w2, w3) =
+	(v2*w3-v3*w2, v3*w1-v1*w3, v1*w2-v2*w1)
+
+
 -- | calculate a norm for a vertex
 normvertex :: ℝ -> Obj3 -> ℝ3 -> (ℝ3, ℝ3)
 normvertex res obj p@(x,y,z) = 
@@ -317,8 +324,8 @@ gen_facelines bot top (samples, eA, eB, eC, edgecrossings) =
 		hat :: Sample -> Sample -> FaceLines
 		hat a b = [(a, ab, b)]
 			where
-				cross = calc_intersect bot top a b eA eB eC
-				ab = (cross, (0,0,0), 0)
+				intersection = calc_intersect bot top a b eA eB eC
+				ab = (intersection, (0,0,0), 0)
 	in
 		case (p0v < 0, p1v < 0, p2v < 0, p3v < 0) of
 		(False, False, False, False) ->	-- not possible
@@ -470,7 +477,6 @@ sharp_find lines =
 			sharp_find_iter $ sharp_calc center
 		else
 			center
-
 
 -- | triangulate the lines
 triangulation :: FaceLines -> TriangleMesh
